@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Nyomtatás Kalkulátor + Filament Raktár</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Exo+2:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+
+<style>
+  :root {
+    --bg: #05060a;
+    --panel: rgba(10, 12, 20, 0.55);
+    --panel2: rgba(10, 12, 20, 0.35);
+    --text: #e9f2ff;
+    --muted: rgba(233, 242, 255, 0.7);
+    --accent: #47aca1;
+    --magenta: rgba(255, 0, 255, 0.75);
+    --magenta2: rgba(255, 0, 255, 0.45);
+    --glow: 0 0 18px rgba(71,172,161,0.35), 0 0 45px rgba(255,0,255,0.25);
+    --border: rgba(255,255,255,0.12);
+    --shadow: 0 18px 45px rgba(0,0,0,0.35);
+    --danger: #ff6b6b;
+    --ok: #7ee787;
+    --gold: #ffd479;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: radial-gradient(circle at top left, #0a0b13, #05060a 55%, #030305);
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    margin: 0;
+    padding: 24px;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .title {
+    font-family:'Orbitron', sans-serif;
+    font-size: 32px;
+    letter-spacing: 1px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .panel::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: 20px;
+    background: linear-gradient(90deg, transparent, rgba(71,172,161,0.8), transparent);
+    animation: holo 30s linear infinite;
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  @keyframes holo {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  .panel-inner {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: 18px;
+  }
+
+  h2 {
+    margin: 0 0 10px;
+    font-size: 18px;
+    letter-spacing: 0.5px;
+    color: var(--magenta);
+    font-family: 'Orbitron', sans-serif;
+    text-transform: uppercase;
+  }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+
+  .row-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 18px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  label {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  input, select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(0,0,0,0.25);
+    color: var(--text);
+    outline: none;
+  }
+
+  input[type="color"] {
+    padding: 4px;
+    height: 42px;
+    cursor: pointer;
+  }
+
+  option { color: #111; }
+
+  input:focus, select:focus, .button:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 10px rgba(71,172,161,0.25);
+  }
+
+  .button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .button {
+    padding: 12px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 0, 255, 0.45);
+    background: linear-gradient(90deg, var(--magenta), var(--magenta2));
+    color: var(--text);
+    cursor: pointer;
+    font-weight: 600;
+    box-shadow: 0 0 18px rgba(255, 0, 255, 0.22);
+    backdrop-filter: blur(6px);
+    text-transform: uppercase;
+    font-family:'Orbitron', sans-serif;
+  }
+
+  .button:hover { filter: brightness(1.05); }
+  .button:active { transform: translateY(1px); }
+  .button.danger { border-color: rgba(255, 107, 107, 0.65); background: rgba(255, 107, 107, 0.35); }
+  .button.ghost { background: rgba(71,172,161,0.18); border-color: rgba(71,172,161,0.5); box-shadow: none; }
+  .button.small { padding: 8px 10px; font-size: 11px; }
+
+  .result {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 18px;
+  }
+
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .result-card {
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.25);
+  }
+
+  .result-card-final {
+    grid-column: 1 / -1;
+    border-color: var(--accent);
+    box-shadow: var(--glow);
+    background: rgba(0,0,0,0.35);
+  }
+
+  .result-title {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .result-value {
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 6px;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .stat-card {
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.25);
+  }
+
+  .stat-card .result-value { color: var(--accent); }
+
+  .badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(0,0,0,0.25);
+    font-size: 12px;
+    opacity: 0.35;
+    filter: grayscale(1);
+  }
+
+  .badge.unlocked {
+    opacity: 1;
+    filter: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 12px rgba(255, 212, 121, 0.3);
+  }
+
+  .badge .emoji { font-size: 15px; }
+
+  .muted {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 12px;
+    line-height: 1.4;
+  }
+
+  .status-msg {
+    font-size: 12px;
+    min-height: 16px;
+  }
+
+  .status-msg.ok { color: var(--ok); }
+  .status-msg.err { color: var(--danger); }
+
+  .table-wrap { overflow-x: auto; }
+
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+
+  .table th, .table td {
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 10px;
+    font-size: 12px;
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  .table th {
+    color: var(--accent);
+    font-family:'Orbitron', sans-serif;
+    font-size: 12px;
+  }
+
+  .swatch {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.35);
+    vertical-align: middle;
+  }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px; height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  @media (max-width: 900px) {
+    .row, .row-3, .result-grid { grid-template-columns: 1fr; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    body { padding: 14px; }
+    .title { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="title">3D Nyomtatás Kalkulátor + Filament Raktár</div>
+
+  <div class="panel">
+    <div class="panel-inner">
+      <h2>Statisztika</h2>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="result-title">Projektek</div><div class="result-value" id="statProjects">0</div></div>
+        <div class="stat-card"><div class="result-title">Felhasznált filament</div><div class="result-value" id="statGrams">0 kg</div></div>
+        <div class="stat-card"><div class="result-title">Gépidő (mért)</div><div class="result-value" id="statHours">0 óra</div></div>
+        <div class="stat-card"><div class="result-title">Kedvenc anyag</div><div class="result-value" id="statFavType">–</div></div>
+        <div class="stat-card"><div class="result-title">Bevétel (rögzített)</div><div class="result-value" id="statRevenue">0 Ft</div></div>
+        <div class="stat-card"><div class="result-title">Anyagköltség (becsült)</div><div class="result-value" id="statMaterialSpend">0 Ft</div></div>
+        <div class="stat-card"><div class="result-title">Becsült profit</div><div class="result-value" id="statProfit">0 Ft</div></div>
+        <div class="stat-card"><div class="result-title">Raktáron lévő tekercsek</div><div class="result-value" id="statSpools">0</div></div>
+      </div>
+      <div class="badges" id="badges"></div>
+      <p class="muted">A bevétel és a gépidő csak azoknál a projekteknél számít, amiket a kalkulátorból vettél át az "ÁR ÉS ADATOK ÁTVÉTELE" gombbal, vagy amiknél kézzel megadtad az árat.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-inner">
+      <h2>Meglévő filament kiválasztása / szerkesztése</h2>
+      <div class="row">
+        <div class="field">
+          <label>Válassz a raktárból</label>
+          <select id="templateSelect" onchange="applyTemplate()">
+            <option value="">– válassz a meglévők közül –</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Szerkesztési mód</label>
+          <input id="editInfo" readonly value="Új filament hozzáadása">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-inner">
+      <h2>Filament hozzáadása / szerkesztése</h2>
+
+      <div class="row">
+        <div class="field">
+          <label>Filament márka</label>
+          <input list="brandList" id="brand" placeholder="pl. BambuLab">
+          <datalist id="brandList">
+            <option value="BambuLab"><option value="Sunlu"><option value="Jayo"><option value="eSun">
+            <option value="PolyMaker"><option value="AzureFilm"><option value="Smart print">
+          </datalist>
+        </div>
+        <div class="field">
+          <label>Filament típus</label>
+          <input list="typeList" id="filamentType" placeholder="pl. PLA">
+          <datalist id="typeList">
+            <option value="PLA"><option value="PETG"><option value="ABS"><option value="TPU"><option value="ASA">
+            <option value="Nylon"><option value="PC"><option value="PVA"><option value="HIPS"><option value="PP">
+            <option value="PETT"><option value="Wood"><option value="Carbon"><option value="Silk"><option value="Glow">
+          </datalist>
+        </div>
+      </div>
+
+      <div class="row-3">
+        <div class="field">
+          <label>Ár (Ft/kg)</label>
+          <input type="number" id="filamentPrice" value="4500" min="0">
+        </div>
+        <div class="field">
+          <label>Kezdetben már felhasznált súly (g)</label>
+          <input type="number" id="initialUsedGrams" value="0" min="0">
+        </div>
+        <div class="field">
+          <label>Szín (címke)</label>
+          <input type="color" id="filamentColor" value="#47aca1">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Tekercs teljes súly (g)</label>
+          <input type="number" id="rollTotalGrams" value="1000" min="1">
+        </div>
+        <div class="field">
+          <label>Tekercs teljes hossz (m)</label>
+          <input type="number" id="rollTotalMeters" value="330" min="1" step="0.01">
+        </div>
+      </div>
+
+      <div class="row">
+        <button class="button" onclick="addOrUpdateFilament()">HOZZÁAD / MENTÉS</button>
+        <button class="button" onclick="resetFields()">ALAPHELYZET</button>
+      </div>
+
+      <div class="status-msg" id="filamentFormStatus"></div>
+      <p class="muted">Ha meglévő filamentet választasz felül, itt módosíthatod és mentheted. Ha újat akarsz, nyomj Alaphelyzetet.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-inner">
+      <div class="panel-head">
+        <h2>Filament raktárkészlet</h2>
+        <div class="actions">
+          <button class="button ghost small" onclick="exportData()">BACKUP MENTÉSE (JSON)</button>
+          <button class="button ghost small" onclick="document.getElementById('importFile').click()">BACKUP BETÖLTÉSE</button>
+          <input type="file" id="importFile" accept="application/json" class="visually-hidden" onchange="importData(event)">
+        </div>
+      </div>
+      <div class="status-msg" id="backupStatus"></div>
+      <div class="table-wrap">
+        <table class="table" id="inventoryTable">
+          <thead>
+            <tr>
+              <th>Szín</th><th>Brand</th><th>Típus</th><th>Ár (Ft/kg)</th><th>Marad (g)</th><th>Marad (m)</th><th>Készlet</th><th>Akció</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="muted">A raktár csak ebben a böngészőben tárolódik, ezért érdemes időnként backupot menteni — böngésző-cache törlésnél az adatok elvesznek.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-inner">
+      <h2>Fogyó készletek (20% alatt)</h2>
+      <div class="table-wrap">
+        <table class="table" id="lowStockTable">
+          <thead>
+            <tr><th>Brand</th><th>Típus</th><th>Marad (g)</th><th>Marad (m)</th><th>Ajánlás</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-inner">
+      <h2>Kalkulátor</h2>
+
+      <div class="row">
+        <div class="field">
+          <label>Választott filament</label>
+          <select id="selectedFilament"></select>
+        </div>
+        <div class="field">
+          <label>Felhasznált súly (g)</label>
+          <input type="number" id="filamentWeight" value="50" min="0">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Nyomtatási idő - Óra</label>
+          <input type="number" id="printHours" value="2" min="0">
+        </div>
+        <div class="field">
+          <label>Nyomtatási idő - Perc</label>
+          <input type="number" id="printMinutes" value="30" min="0" max="59">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Áram díj</label>
+          <select id="electricPrice">
+            <option value="36.386">A1 (limitig) - 36,386 Ft/kWh</option>
+            <option value="70.1">A1 (limit felett) - 70,1 Ft/kWh</option>
+            <option value="23">B (éjszakai) - 23 Ft/kWh</option>
+            <option value="61">B (éjszakai) - 61 Ft/kWh</option>
+            <option value="23.5">H (fűtési szezon) - 23,5 Ft/kWh</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Fogyasztás (W)</label>
+          <select id="powerUsage">
+            <option value="200">200 W – PLA / PETG (átlagos nyomtatás)</option>
+            <option value="250">250 W – ABS / Nylon</option>
+            <option value="300">300 W – TPU / Flex</option>
+            <option value="500">500 W – gyors fűtés / csúcs</option>
+            <option value="800">800 W – extrém csúcs</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Nyomtatási minőség / felár</label>
+          <select id="quality">
+            <option value="0">Standard - nincs felár</option>
+            <option value="100">High Quality +100 Ft</option>
+            <option value="200">High Quality +200 Ft</option>
+            <option value="300">High Quality +300 Ft</option>
+            <option value="400">High Quality +400 Ft</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Haszonkulcs</label>
+          <select id="profitMargin"></select>
+        </div>
+      </div>
+
+      <div class="row">
+        <button class="button" onclick="calculate()">SZÁMOLÁS</button>
+        <button class="button" onclick="resetCalculator()">ALAPHELYZET</button>
+      </div>
+
+      <div class="result">
+        <div class="result-grid">
+          <div class="result-card"><div class="result-title">Anyagköltség</div><div class="result-value" id="materialCost">– Ft</div></div>
+          <div class="result-card"><div class="result-title">Áramköltség</div><div class="result-value" id="electricCost">– Ft</div></div>
+          <div class="result-card"><div class="result-title">Kopó alkatrész</div><div class="result-value" id="wearCost">– Ft</div></div>
+          <div class="result-card"><div class="result-title">Összesen (haszon nélkül)</div><div class="result-value" id="totalBeforeProfit">– Ft</div></div>
+          <div class="result-card result-card-final"><div class="result-title">Végső ár</div><div class="result-value" id="finalPrice">– Ft</div></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Választott beállítások</label>
+        <input id="summary" readonly>
+      </div>
+
+      <button class="button ghost" id="transferBtn" onclick="transferToProject()" disabled>ÁR ÉS ADATOK ÁTVÉTELE A NAPLÓBA ⬇</button>
+      <p class="muted">Alap beállási költség: 1500 Ft. Kopó alkatrész: 100 Ft/óra. A haszonkulcs a végső árra kerül rá. Számolás után a gomb egy kattintással átviszi a filamentet, a súlyt, a gépidőt és a végső árat a lenti projektnaplóba.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-inner" id="projectPanel">
+      <h2>Nyomtatott projektek</h2>
+      <div class="row">
+        <div class="field">
+          <label>Projekt neve</label>
+          <input id="projectName" list="projectNameList" placeholder="pl. alkatrész nyomtatás">
+          <datalist id="projectNameList"></datalist>
+        </div>
+        <div class="field"><label>Dátum</label><input type="date" id="projectDate"></div>
+      </div>
+      <div class="row-3">
+        <div class="field"><label>Filament</label><select id="projectFilament"></select></div>
+        <div class="field"><label>Felhasznált súly (g)</label><input type="number" id="projectGrams" min="0" value="0"></div>
+        <div class="field"><label>Eladási ár (Ft, opcionális)</label><input type="number" id="projectPrice" min="0" placeholder="pl. 4500"></div>
+      </div>
+      <button class="button" onclick="addProject()">PROJEKT MENTÉSE</button>
+      <div class="status-msg" id="projectStatus"></div>
+      <div class="table-wrap">
+        <table class="table" id="projectsTable">
+          <thead><tr><th>Dátum</th><th>Projekt</th><th>Filament</th><th>Súly</th><th>Ár</th><th>Akció</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-inner">
+      <div class="panel-head">
+        <h2>Havi kimutatás</h2>
+        <div class="field" style="min-width: 160px;">
+          <label>Időszak</label>
+          <select id="chartRange" onchange="renderMonthlyChart()">
+            <option value="6">Utolsó 6 hónap</option>
+            <option value="12" selected>Utolsó 12 hónap</option>
+            <option value="999">Teljes előzmény</option>
+          </select>
+        </div>
+      </div>
+      <div id="chartEmpty" class="muted" style="display:none;">Még nincs elég adat a grafikonhoz — mentsd el az első pár projektedet dátummal együtt.</div>
+      <div style="position: relative; height: 320px;">
+        <canvas id="monthlyChart"></canvas>
+      </div>
+      <p class="muted">A szaggatott vonal a havi felhasznált filamentet (kg) mutatja a jobb oldali tengelyen, az oszlopok a rögzített bevételt (Ft) a bal oldalin.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-inner">
+      <h2>Használati útmutató</h2>
+      <div class="muted">
+        1) Vidd fel a filamentet a márkával, típussal, árral, teljes súllyal és teljes hosszal.<br>
+        2) A raktárban a FELHASZNÁLÁS gombbal tudod csökkenteni a készletet.<br>
+        3) A kalkulátorban válassz filamentet, add meg a súlyt, időt, áramdíjat, fogyasztást és haszonkulcsot, majd nyomj Számolást.<br>
+        4) A "Ár és adatok átvétele" gombbal a számolás eredménye egy kattintással bekerül a projektnaplóba — a nevet a régi projektjeid alapján fel is ajánlja gépelés közben.<br>
+        5) A projekt mentése automatikusan csökkenti a filament készletet — törléskor felajánljuk a visszaállítást.<br>
+        6) Az adatok csak ebben a böngészőben tárolódnak — mentsd le időnként a backupot, hogy ne veszíts el semmit.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const setupCost = 1500;
+  const wearCostPerHour = 100;
+  let editingFilamentId = null;
+  let lastCalc = null; // { filamentId, weight, hours, price }
+  let monthlyChartInstance = null;
+
+  let filaments = safeLoad("filaments", []);
+  let projects = safeLoad("printedProjects", []);
+
+  function newId() {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return window.crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function safeLoad(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : fallback;
+    } catch (error) {
+      console.warn("Hibás localStorage adat:", key, error);
+      return fallback;
+    }
+  }
+
+  function saveFilaments() {
+    try {
+      localStorage.setItem("filaments", JSON.stringify(filaments));
+    } catch (error) {
+      console.warn("Nem sikerült menteni a filamenteket:", error);
+    }
+  }
+
+  function saveProjects() {
+    try {
+      localStorage.setItem("printedProjects", JSON.stringify(projects));
+    } catch (error) {
+      console.warn("Nem sikerült menteni a projekteket:", error);
+    }
+  }
+
+  function money(value) {
+    return Math.round(Number(value) || 0).toLocaleString("hu-HU") + " Ft";
+  }
+
+  function numberValue(id, fallback = 0) {
+    const value = Number(document.getElementById(id).value);
+    return Number.isFinite(value) ? value : fallback;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function showStatus(elementId, message, kind) {
+    const el = document.getElementById(elementId);
+    el.textContent = message;
+    el.className = "status-msg" + (kind ? " " + kind : "");
+    if (message) {
+      setTimeout(() => {
+        if (el.textContent === message) el.textContent = "";
+      }, 4000);
+    }
+  }
+
+  function fillProfitOptions() {
+    const select = document.getElementById("profitMargin");
+    const values = [0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100,110,120,130,140,150,160,170,180,190,200];
+    select.innerHTML = values.map(v => `<option value="${v}">${v}%</option>`).join("");
+  }
+
+  function renderInventory() {
+    const tbody = document.querySelector("#inventoryTable tbody");
+    const lowBody = document.querySelector("#lowStockTable tbody");
+    const selectedFilament = document.getElementById("selectedFilament");
+    const templateSelect = document.getElementById("templateSelect");
+    const projectFilament = document.getElementById("projectFilament");
+
+    const prevSelected = selectedFilament.value;
+    const prevProjectFilament = projectFilament.value;
+
+    tbody.innerHTML = "";
+    lowBody.innerHTML = "";
+
+    filaments.forEach(f => {
+      const percentLeft = f.totalGrams > 0 ? (f.gramsLeft / f.totalGrams) * 100 : 0;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><span class="swatch" style="background:${escapeHtml(f.color || '#47aca1')}"></span></td>
+        <td>${escapeHtml(f.brand)}</td>
+        <td>${escapeHtml(f.type)}</td>
+        <td>${money(f.priceKg)}</td>
+        <td>${Math.round(f.gramsLeft)}</td>
+        <td>${Number(f.metersLeft).toFixed(1)}</td>
+        <td>${Math.round(percentLeft)}%</td>
+        <td class="actions">
+          <button class="button small" onclick="useFilament('${f.id}')">FELHASZNÁLÁS</button>
+          <button class="button small" onclick="editFilament('${f.id}')">SZERKESZT</button>
+          <button class="button small danger" onclick="deleteFilament('${f.id}')">TÖRLÉS</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+
+      if (percentLeft < 20) {
+        const low = document.createElement("tr");
+        low.innerHTML = `
+          <td>${escapeHtml(f.brand)}</td>
+          <td>${escapeHtml(f.type)}</td>
+          <td>${Math.round(f.gramsLeft)}</td>
+          <td>${Number(f.metersLeft).toFixed(1)}</td>
+          <td>Rendelj filamentet, hamarosan elfogy!</td>
+        `;
+        lowBody.appendChild(low);
+      }
+    });
+
+    if (!filaments.length) {
+      tbody.innerHTML = `<tr><td colspan="8">Még nincs rögzített filament.</td></tr>`;
+      lowBody.innerHTML = `<tr><td colspan="5">Nincs fogyó készlet.</td></tr>`;
+    } else if (!lowBody.innerHTML) {
+      lowBody.innerHTML = `<tr><td colspan="5">Nincs 20% alatti készlet.</td></tr>`;
+    }
+
+    const options = filaments.map(f => `<option value="${f.id}">${escapeHtml(f.brand)} - ${escapeHtml(f.type)}</option>`).join("");
+    selectedFilament.innerHTML = filaments.length ? options : `<option value="">Nincs filament</option>`;
+    projectFilament.innerHTML = filaments.length ? options : `<option value="">Nincs filament</option>`;
+    templateSelect.innerHTML = `<option value="">– válassz a meglévők közül –</option>` + options;
+
+    if (filaments.some(f => f.id === prevSelected)) selectedFilament.value = prevSelected;
+    if (filaments.some(f => f.id === prevProjectFilament)) projectFilament.value = prevProjectFilament;
+
+    renderStats();
+  }
+
+  function addOrUpdateFilament() {
+    const brand = document.getElementById("brand").value.trim();
+    const type = document.getElementById("filamentType").value.trim();
+    const priceKg = numberValue("filamentPrice");
+    const initialUsedGrams = numberValue("initialUsedGrams");
+    const totalGrams = numberValue("rollTotalGrams");
+    const totalMeters = numberValue("rollTotalMeters");
+    const color = document.getElementById("filamentColor").value || "#47aca1";
+
+    if (!brand || !type || priceKg <= 0 || totalGrams <= 0 || totalMeters <= 0) {
+      showStatus("filamentFormStatus", "Kérlek tölts ki minden fontos mezőt helyes értékkel!", "err");
+      return;
+    }
+
+    const used = Math.min(Math.max(initialUsedGrams, 0), totalGrams);
+    const gramsLeft = totalGrams - used;
+    const metersLeft = totalMeters * (gramsLeft / totalGrams);
+
+    if (editingFilamentId) {
+      const f = filaments.find(item => item.id === editingFilamentId);
+      if (f) {
+        f.brand = brand;
+        f.type = type;
+        f.priceKg = priceKg;
+        f.totalGrams = totalGrams;
+        f.gramsLeft = gramsLeft;
+        f.totalMeters = totalMeters;
+        f.metersLeft = metersLeft;
+        f.color = color;
+      }
+      showStatus("filamentFormStatus", "Filament frissítve.", "ok");
+    } else {
+      filaments.push({
+        id: newId(),
+        brand,
+        type,
+        priceKg,
+        totalGrams,
+        gramsLeft,
+        totalMeters,
+        metersLeft,
+        color
+      });
+      showStatus("filamentFormStatus", "Filament hozzáadva.", "ok");
+    }
+
+    saveFilaments();
+    renderInventory();
+    resetFields();
+  }
+
+  function editFilament(id) {
+    const f = filaments.find(item => item.id === id);
+    if (!f) return;
+
+    editingFilamentId = id;
+    document.getElementById("brand").value = f.brand;
+    document.getElementById("filamentType").value = f.type;
+    document.getElementById("filamentPrice").value = f.priceKg;
+    document.getElementById("rollTotalGrams").value = f.totalGrams;
+    document.getElementById("rollTotalMeters").value = f.totalMeters;
+    document.getElementById("initialUsedGrams").value = Math.max(0, f.totalGrams - f.gramsLeft);
+    document.getElementById("filamentColor").value = f.color || "#47aca1";
+    document.getElementById("templateSelect").value = id;
+    document.getElementById("editInfo").value = "Szerkesztés alatt: " + f.brand + " - " + f.type;
+  }
+
+  function applyTemplate() {
+    const id = document.getElementById("templateSelect").value;
+    if (!id) {
+      resetFields();
+      return;
+    }
+    editFilament(id);
+  }
+
+  function deleteFilament(id) {
+    const f = filaments.find(item => item.id === id);
+    if (!f) return;
+    if (!confirm(`Biztosan törlöd ezt a filamentet?\n${f.brand} - ${f.type}`)) return;
+    filaments = filaments.filter(item => item.id !== id);
+    saveFilaments();
+    renderInventory();
+    resetFields();
+  }
+
+  function useFilament(id) {
+    const f = filaments.find(item => item.id === id);
+    if (!f) return;
+
+    const gramsInput = prompt("Hány grammot használtál?", "0");
+    if (gramsInput === null) return;
+    const grams = Number(gramsInput.replace(",", "."));
+
+    if (!Number.isFinite(grams) || grams < 0) {
+      alert("Hibás gramm érték!");
+      return;
+    }
+
+    const meters = f.totalGrams > 0 ? (grams / f.totalGrams) * f.totalMeters : 0;
+    f.gramsLeft = Math.max(0, f.gramsLeft - grams);
+    f.metersLeft = Math.max(0, f.metersLeft - meters);
+
+    saveFilaments();
+    renderInventory();
+  }
+
+  function resetFields() {
+    editingFilamentId = null;
+    document.getElementById("brand").value = "";
+    document.getElementById("filamentType").value = "";
+    document.getElementById("filamentPrice").value = 4500;
+    document.getElementById("initialUsedGrams").value = 0;
+    document.getElementById("rollTotalGrams").value = 1000;
+    document.getElementById("rollTotalMeters").value = 330;
+    document.getElementById("filamentColor").value = "#47aca1";
+    document.getElementById("templateSelect").value = "";
+    document.getElementById("editInfo").value = "Új filament hozzáadása";
+  }
+
+  function calculate() {
+    const filamentId = document.getElementById("selectedFilament").value;
+    const filament = filaments.find(f => f.id === filamentId);
+
+    if (!filament) {
+      document.getElementById("materialCost").innerText = "– Ft";
+      document.getElementById("electricCost").innerText = "– Ft";
+      document.getElementById("wearCost").innerText = "– Ft";
+      document.getElementById("totalBeforeProfit").innerText = "– Ft";
+      document.getElementById("finalPrice").innerText = "– Ft";
+      document.getElementById("summary").value = "Először adj hozzá filamentet.";
+      lastCalc = null;
+      document.getElementById("transferBtn").disabled = true;
+      return;
+    }
+
+    const filamentWeight = numberValue("filamentWeight");
+    const printHours = numberValue("printHours");
+    const printMinutes = numberValue("printMinutes");
+    const electricPrice = numberValue("electricPrice");
+    const powerUsage = numberValue("powerUsage");
+    const qualityExtra = numberValue("quality");
+    const profitMargin = numberValue("profitMargin");
+
+    if (filamentWeight < 0 || printHours < 0 || printMinutes < 0) {
+      alert("A súly és az idő nem lehet negatív!");
+      return;
+    }
+
+    const materialCost = (filament.priceKg / 1000) * filamentWeight;
+    const totalHours = printHours + (printMinutes / 60);
+    const electricCost = (powerUsage / 1000) * totalHours * electricPrice;
+    const wearCost = totalHours * wearCostPerHour;
+    const totalBeforeProfit = setupCost + materialCost + electricCost + wearCost + qualityExtra;
+    const finalPrice = totalBeforeProfit * (1 + (profitMargin / 100));
+
+    document.getElementById("materialCost").innerText = money(materialCost);
+    document.getElementById("electricCost").innerText = money(electricCost);
+    document.getElementById("wearCost").innerText = money(wearCost);
+    document.getElementById("totalBeforeProfit").innerText = money(totalBeforeProfit);
+    document.getElementById("finalPrice").innerText = money(finalPrice);
+
+    const qualityText = document.getElementById("quality").selectedOptions[0].text;
+    const electricText = document.getElementById("electricPrice").selectedOptions[0].text;
+    const powerText = document.getElementById("powerUsage").selectedOptions[0].text;
+    document.getElementById("summary").value = `${filament.brand} ${filament.type} | ${filamentWeight} g | ${qualityText} | ${electricText} | ${powerText}`;
+
+    lastCalc = {
+      filamentId: filament.id,
+      weight: filamentWeight,
+      hours: totalHours,
+      price: finalPrice
+    };
+    document.getElementById("transferBtn").disabled = false;
+  }
+
+  function resetCalculator() {
+    document.getElementById("filamentWeight").value = 50;
+    document.getElementById("printHours").value = 2;
+    document.getElementById("printMinutes").value = 30;
+    document.getElementById("electricPrice").value = "36.386";
+    document.getElementById("powerUsage").value = "200";
+    document.getElementById("quality").value = "0";
+    document.getElementById("profitMargin").value = "0";
+    calculate();
+  }
+
+  function transferToProject() {
+    if (!lastCalc) return;
+    document.getElementById("projectFilament").value = lastCalc.filamentId;
+    document.getElementById("projectGrams").value = Math.round(lastCalc.weight);
+    document.getElementById("projectPrice").value = Math.round(lastCalc.price);
+    document.getElementById("projectPanel").dataset.pendingHours = lastCalc.hours;
+    document.getElementById("projectPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("projectName").focus();
+    showStatus("projectStatus", "Adatok átvéve a kalkulátorból — add meg a projekt nevét és mentsd el.", "ok");
+  }
+
+  function addProject() {
+    const name = document.getElementById("projectName").value.trim();
+    const date = document.getElementById("projectDate").value || new Date().toISOString().slice(0, 10);
+    const filamentId = document.getElementById("projectFilament").value;
+    const grams = numberValue("projectGrams");
+    const priceInput = document.getElementById("projectPrice").value;
+    const price = priceInput === "" ? null : numberValue("projectPrice");
+    const filament = filaments.find(f => f.id === filamentId);
+    const pendingHours = Number(document.getElementById("projectPanel").dataset.pendingHours || 0);
+
+    if (!name || !filament || grams <= 0) {
+      showStatus("projectStatus", "Kérlek add meg a projekt nevét, filamentet és a felhasznált grammot!", "err");
+      return;
+    }
+
+    projects.push({
+      id: newId(),
+      name,
+      date,
+      filamentId,
+      filamentName: filament.brand + " - " + filament.type,
+      filamentType: filament.type,
+      grams,
+      price: price && price > 0 ? price : null,
+      hours: pendingHours > 0 ? pendingHours : 0
+    });
+
+    const meters = filament.totalGrams > 0 ? (grams / filament.totalGrams) * filament.totalMeters : 0;
+    filament.gramsLeft = Math.max(0, filament.gramsLeft - grams);
+    filament.metersLeft = Math.max(0, filament.metersLeft - meters);
+
+    saveProjects();
+    saveFilaments();
+    renderProjects();
+    renderInventory();
+    document.getElementById("projectName").value = "";
+    document.getElementById("projectGrams").value = 0;
+    document.getElementById("projectPrice").value = "";
+    document.getElementById("projectPanel").dataset.pendingHours = "0";
+    lastCalc = null;
+    document.getElementById("transferBtn").disabled = true;
+    showStatus("projectStatus", "Projekt elmentve, készlet frissítve.", "ok");
+  }
+
+  function deleteProject(id) {
+    const p = projects.find(item => item.id === id);
+    if (!p) return;
+    if (!confirm("Biztosan törlöd ezt a projektet?")) return;
+
+    const filament = filaments.find(f => f.id === p.filamentId);
+    if (filament && confirm(`Visszaállítod a(z) ${p.grams} g filamentet a(z) ${filament.brand} - ${filament.type} készletbe?`)) {
+      const meters = filament.totalGrams > 0 ? (p.grams / filament.totalGrams) * filament.totalMeters : 0;
+      filament.gramsLeft = Math.min(filament.totalGrams, filament.gramsLeft + p.grams);
+      filament.metersLeft = Math.min(filament.totalMeters, filament.metersLeft + meters);
+      saveFilaments();
+      renderInventory();
+    }
+
+    projects = projects.filter(item => item.id !== id);
+    saveProjects();
+    renderProjects();
+  }
+
+  function renderProjects() {
+    const tbody = document.querySelector("#projectsTable tbody");
+    tbody.innerHTML = "";
+
+    if (!projects.length) {
+      tbody.innerHTML = `<tr><td colspan="6">Még nincs mentett projekt.</td></tr>`;
+    } else {
+      projects
+        .slice()
+        .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+        .forEach(p => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${escapeHtml(p.date)}</td>
+            <td>${escapeHtml(p.name)}</td>
+            <td>${escapeHtml(p.filamentName)}</td>
+            <td>${Math.round(p.grams)} g</td>
+            <td>${p.price ? money(p.price) : "–"}</td>
+            <td><button class="button small danger" onclick="deleteProject('${p.id}')">TÖRLÉS</button></td>
+          `;
+          tbody.appendChild(tr);
+        });
+    }
+
+    const uniqueNames = [...new Set(projects.map(p => p.name))];
+    document.getElementById("projectNameList").innerHTML =
+      uniqueNames.map(n => `<option value="${escapeHtml(n)}"></option>`).join("");
+
+    renderStats();
+    renderMonthlyChart();
+  }
+
+  function monthLabel(key) {
+    const [year, month] = key.split("-");
+    const names = ["jan", "feb", "márc", "ápr", "máj", "jún", "júl", "aug", "szept", "okt", "nov", "dec"];
+    return `${names[Number(month) - 1]} ${year.slice(2)}`;
+  }
+
+  function renderMonthlyChart() {
+    const canvas = document.getElementById("monthlyChart");
+    const emptyMsg = document.getElementById("chartEmpty");
+    if (!canvas || typeof Chart === "undefined") return;
+
+    const dated = projects.filter(p => p.date);
+    if (!dated.length) {
+      emptyMsg.style.display = "block";
+      canvas.style.display = "none";
+      if (monthlyChartInstance) { monthlyChartInstance.destroy(); monthlyChartInstance = null; }
+      return;
+    }
+    emptyMsg.style.display = "none";
+    canvas.style.display = "block";
+
+    const byMonth = {};
+    dated.forEach(p => {
+      const key = String(p.date).slice(0, 7);
+      if (!byMonth[key]) byMonth[key] = { revenue: 0, grams: 0 };
+      byMonth[key].revenue += Number(p.price) || 0;
+      byMonth[key].grams += Number(p.grams) || 0;
+    });
+
+    let keys = Object.keys(byMonth).sort();
+    const range = Number(document.getElementById("chartRange").value || 12);
+    if (range < 999) keys = keys.slice(-range);
+
+    const labels = keys.map(monthLabel);
+    const revenueData = keys.map(k => Math.round(byMonth[k].revenue));
+    const kgData = keys.map(k => Number((byMonth[k].grams / 1000).toFixed(2)));
+
+    if (monthlyChartInstance) monthlyChartInstance.destroy();
+
+    monthlyChartInstance = new Chart(canvas.getContext("2d"), {
+      data: {
+        labels,
+        datasets: [
+          {
+            type: "bar",
+            label: "Bevétel (Ft)",
+            data: revenueData,
+            backgroundColor: "rgba(71,172,161,0.55)",
+            borderColor: "rgba(71,172,161,1)",
+            borderWidth: 1,
+            yAxisID: "y"
+          },
+          {
+            type: "line",
+            label: "Felhasznált filament (kg)",
+            data: kgData,
+            borderColor: "rgba(255,0,255,0.85)",
+            backgroundColor: "rgba(255,0,255,0.85)",
+            borderDash: [6, 4],
+            tension: 0.3,
+            pointRadius: 3,
+            yAxisID: "y1"
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { labels: { color: "#e9f2ff", font: { family: "'Exo 2', sans-serif" } } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ctx.dataset.yAxisID === "y"
+                ? ` Bevétel: ${money(ctx.parsed.y)}`
+                : ` Filament: ${ctx.parsed.y} kg`
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: "#e9f2ff" },
+            grid: { color: "rgba(255,255,255,0.08)" }
+          },
+          y: {
+            position: "left",
+            beginAtZero: true,
+            ticks: { color: "rgba(71,172,161,1)" },
+            grid: { color: "rgba(255,255,255,0.08)" },
+            title: { display: true, text: "Ft", color: "rgba(71,172,161,1)" }
+          },
+          y1: {
+            position: "right",
+            beginAtZero: true,
+            ticks: { color: "rgba(255,0,255,0.85)" },
+            grid: { display: false },
+            title: { display: true, text: "kg", color: "rgba(255,0,255,0.85)" }
+          }
+        }
+      }
+    });
+  }
+
+  function computeStats() {
+    const totalProjects = projects.length;
+    const totalGrams = projects.reduce((sum, p) => sum + (Number(p.grams) || 0), 0);
+    const totalHours = projects.reduce((sum, p) => sum + (Number(p.hours) || 0), 0);
+    const totalRevenue = projects.reduce((sum, p) => sum + (Number(p.price) || 0), 0);
+
+    const materialSpend = projects.reduce((sum, p) => {
+      const f = filaments.find(item => item.id === p.filamentId);
+      if (!f || !f.totalGrams) return sum;
+      return sum + (f.priceKg / 1000) * (Number(p.grams) || 0);
+    }, 0);
+
+    const typeTotals = {};
+    projects.forEach(p => {
+      const type = p.filamentType || (p.filamentName || "").split(" - ")[1] || "ismeretlen";
+      typeTotals[type] = (typeTotals[type] || 0) + (Number(p.grams) || 0);
+    });
+    const favType = Object.keys(typeTotals).sort((a, b) => typeTotals[b] - typeTotals[a])[0] || "–";
+    const distinctTypes = Object.keys(typeTotals).length;
+
+    return {
+      totalProjects,
+      totalGrams,
+      totalHours,
+      totalRevenue,
+      materialSpend,
+      profit: totalRevenue - materialSpend,
+      favType,
+      distinctTypes,
+      spoolCount: filaments.length
+    };
+  }
+
+  function renderStats() {
+    const s = computeStats();
+    document.getElementById("statProjects").innerText = s.totalProjects;
+    document.getElementById("statGrams").innerText = (s.totalGrams / 1000).toFixed(2) + " kg";
+    document.getElementById("statHours").innerText = s.totalHours.toFixed(1) + " óra";
+    document.getElementById("statFavType").innerText = s.favType;
+    document.getElementById("statRevenue").innerText = money(s.totalRevenue);
+    document.getElementById("statMaterialSpend").innerText = money(s.materialSpend);
+    document.getElementById("statProfit").innerText = money(s.profit);
+    document.getElementById("statSpools").innerText = s.spoolCount;
+
+    const achievements = [
+      { emoji: "🖨️", label: "Első nyomat", unlocked: s.totalProjects >= 1 },
+      { emoji: "🔥", label: "Rutinos (10 projekt)", unlocked: s.totalProjects >= 10 },
+      { emoji: "🏆", label: "Nyomtatás mester (50 projekt)", unlocked: s.totalProjects >= 50 },
+      { emoji: "⚖️", label: "Kilogramm klub (1 kg)", unlocked: s.totalGrams >= 1000 },
+      { emoji: "🚀", label: "5 kilós szint", unlocked: s.totalGrams >= 5000 },
+      { emoji: "⏱️", label: "Gépidő veterán (24 óra)", unlocked: s.totalHours >= 24 },
+      { emoji: "💰", label: "Első bevétel", unlocked: s.totalRevenue > 0 },
+      { emoji: "💎", label: "100 000 Ft klub", unlocked: s.totalRevenue >= 100000 },
+      { emoji: "🎨", label: "Színkeverő (5 anyagtípus)", unlocked: s.distinctTypes >= 5 }
+    ];
+
+    document.getElementById("badges").innerHTML = achievements.map(a => `
+      <div class="badge ${a.unlocked ? "unlocked" : ""}" title="${a.unlocked ? "Kibontva" : "Még nincs kibontva"}">
+        <span class="emoji">${a.emoji}</span><span>${escapeHtml(a.label)}</span>
+      </div>
+    `).join("");
+  }
+
+  function exportData() {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      filaments,
+      projects
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `filament-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showStatus("backupStatus", "Backup letöltve.", "ok");
+  }
+
+  function importData(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result));
+        if (!Array.isArray(data.filaments) || !Array.isArray(data.projects)) {
+          throw new Error("Hiányzó vagy hibás formátumú backup fájl.");
+        }
+        const replace = confirm("A meglévő raktárt és projekteket felülírja a betöltött backup. Folytatod?");
+        if (!replace) return;
+
+        filaments = data.filaments;
+        projects = data.projects;
+        saveFilaments();
+        saveProjects();
+        renderInventory();
+        renderProjects();
+        resetFields();
+        showStatus("backupStatus", "Backup sikeresen betöltve.", "ok");
+      } catch (error) {
+        console.warn("Backup betöltési hiba:", error);
+        showStatus("backupStatus", "Nem sikerült beolvasni a fájlt — ellenőrizd, hogy jó backup JSON-t választottál.", "err");
+      } finally {
+        event.target.value = "";
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  fillProfitOptions();
+  renderInventory();
+  renderProjects();
+  resetCalculator();
+</script>
+</body>
+</html>
